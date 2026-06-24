@@ -7,7 +7,10 @@ import type { AnalysisResult } from "@/types";
 import ScoreCard from "@/components/analysis/ScoreCard";
 import PhaseViewer from "@/components/analysis/PhaseViewer";
 import ReportPanel from "@/components/analysis/ReportPanel";
+import VideoOverlay from "@/components/analysis/VideoOverlay";
 import { formatDate } from "@/lib/utils";
+
+const BACKEND = "https://swing-ai-production-342a.up.railway.app";
 
 export default function AnalysisPage() {
   const { id } = useParams<{ id: string }>();
@@ -46,6 +49,8 @@ export default function AnalysisPage() {
     );
   }
 
+  const videoUrl = result.video_url ? `${BACKEND}${result.video_url}` : null;
+
   return (
     <div className="min-h-screen bg-dark-950 bg-grid-dark bg-grid">
       {/* Header */}
@@ -82,26 +87,37 @@ export default function AnalysisPage() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 py-6">
+      <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        {/* Video with overlay — full width on top */}
+        {videoUrl && (result as any).phase_timestamps && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-dark-800 border border-white/10 rounded-2xl p-4"
+          >
+            <h2 className="font-semibold text-white mb-3 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-brand-500" />
+              Vídeo con análisis biomecánico
+            </h2>
+            <p className="text-white/40 text-xs mb-3">
+              Reproduce el vídeo — las líneas de análisis aparecen automáticamente en cada fase
+            </p>
+            <VideoOverlay
+              videoUrl={videoUrl}
+              phaseTimestamps={(result as any).phase_timestamps}
+              phaseLandmarks={(result as any).phase_landmarks ?? {}}
+              duration={result.duration}
+            />
+          </motion.div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left column: score + phases */}
+          {/* Left: scores */}
           <div className="lg:col-span-1 space-y-6">
             <ScoreCard scores={result.scores} />
-
-            {/* Video preview */}
-            {result.video_url && (
-              <div className="bg-dark-800 border border-white/10 rounded-2xl overflow-hidden">
-                <video
-                  src={`https://swing-ai-production-342a.up.railway.app${result.video_url}`}
-                  controls
-                  muted
-                  className="w-full"
-                />
-              </div>
-            )}
           </div>
 
-          {/* Right column: phases + report */}
+          {/* Right: phases + report */}
           <div className="lg:col-span-2 space-y-6">
             {Object.keys(result.keyframes ?? {}).length > 0 && (
               <motion.div

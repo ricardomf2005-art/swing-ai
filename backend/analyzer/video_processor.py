@@ -93,18 +93,22 @@ def process_video(video_path: str, view: str = "dtl") -> dict:
     del small_frames
     gc.collect()
 
-    # Phase detection
+    # Phase detection — returns LOCAL indices (0..len-1)
     phase_map = detect_phases(landmarks_list, view)
 
     def lm_at(phase: str) -> Optional[dict]:
-        fi = phase_map.get(phase, 0)
-        closest_local = min(range(len(frame_indices)), key=lambda i: abs(frame_indices[i] - fi))
-        return landmarks_list[closest_local]
+        local = min(phase_map.get(phase, 0), len(landmarks_list) - 1)
+        return landmarks_list[local]
 
     def ball_at(phase: str) -> Optional[list]:
-        fi = phase_map.get(phase, 0)
-        closest_local = min(range(len(frame_indices)), key=lambda i: abs(frame_indices[i] - fi))
-        return ball_positions[closest_local]
+        local = min(phase_map.get(phase, 0), len(ball_positions) - 1)
+        return ball_positions[local]
+
+    # Map phase local indices → video timestamps for frontend overlay
+    phase_timestamps = {
+        phase: round(frame_indices[min(local, len(frame_indices) - 1)] / fps, 3)
+        for phase, local in phase_map.items()
+    }
 
     lm_address = lm_at("address")
     lm_top = lm_at("top_of_backswing")
@@ -137,9 +141,18 @@ def process_video(video_path: str, view: str = "dtl") -> dict:
     scores = aggregate_scores(metrics)
     report = generate_report(metrics, scores, view, phase_map)
 
-    # Keyframes from thumbnails
-    keyframes = _extract_keyframes(thumb_frames, frame_indices, phase_map, estimator, landmarks_list)
+    # Keyframes from thumbnails — use LOCAL indices directly
+    keyframes = _extract_keyframes(thumb_frames, phase_map, estimator, landmarks_list)
     del thumb_frames
+
+    # Per-phase landmark data for frontend canvas overlay
+    phase_landmarks = {}
+    for phase, local in phase_map.items():
+        local = min(local, len(landmarks_list) - 1)
+        lm = landmarks_list[local]
+        if lm:
+            phase_landmarks[phase] = {k: v[:2] for k, v in lm.items()}
+
     estimator.close()
     gc.collect()
 
@@ -152,6 +165,8 @@ def process_video(video_path: str, view: str = "dtl") -> dict:
         "metrics": metrics,
         "report": report,
         "phase_frames": phase_map,
+        "phase_timestamps": phase_timestamps,
+        "phase_landmarks": phase_landmarks,
         "keyframes": keyframes,
     }
 
@@ -189,10 +204,8 @@ def _detect_impact_risks(lm_impact: dict, metrics: dict) -> list:
 
 def _detect_early_extension(landmarks_list: list, phase_map: dict, frame_indices: list) -> bool:
     try:
-        addr_fi = phase_map.get("address", 0)
-        impact_fi = phase_map.get("impact", 0)
-        addr_local = min(range(len(frame_indices)), key=lambda i: abs(frame_indices[i] - addr_fi))
-        impact_local = min(range(len(frame_indices)), key=lambda i: abs(frame_indices[i] - impact_fi))
+        addr_local = min(phase_map.get("address", 0), len(landmarks_list) - 1)
+        impact_local = min(phase_map.get("impact", 0), len(landmarks_list) - 1)
         lm_a = landmarks_list[addr_local]
         lm_i = landmarks_list[impact_local]
         if not lm_a or not lm_i:
@@ -207,11 +220,11 @@ def _detect_early_extension(landmarks_list: list, phase_map: dict, frame_indices
 
 
 def _extract_keyframes(
-    frames: list, frame_indices: list, phase_map: dict, estimator: PoseEstimator, landmarks_list: list
+    frames: list, phase_map: dict, estimator: PoseEstimator, landmarks_list: list
 ) -> dict:
     keyframes = {}
-    for phase, fi in phase_map.items():
-        local = min(range(len(frame_indices)), key=lambda i: abs(frame_indices[i] - fi))
+    for phase, local in phase_map.items():
+        local = min(local, len(frames) - 1)
         frame = frames[local].copy()
         lm = landmarks_list[local]
         if lm:
