@@ -33,11 +33,11 @@ export default function HomePage() {
       formData.append("view", view);
 
       const res = await fetch("/api/analyze", { method: "POST", body: formData });
-      if (!res.ok) throw new Error("Analysis failed");
-      const result: AnalysisResult = await res.json();
-      router.push(`/analysis/${result.id}`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "Analysis failed");
+      router.push(`/analysis/${json.id}`);
     } catch (err) {
-      alert("Error al analizar el vídeo. Asegúrate de que el servidor backend está en marcha.");
+      alert("Error: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsAnalyzing(false);
     }
