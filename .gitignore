@@ -1,0 +1,14 @@
+node_modules/
+.next/
+__pycache__/
+*.pyc
+.venv/
+uploads/*
+sessions/*
+!uploads/.gitkeep
+!sessions/.gitkeep
+.env
+.env.local
+*.mp4
+*.mov
+*.avi
