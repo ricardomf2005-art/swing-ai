@@ -18,7 +18,7 @@ from .scoring import aggregate_scores
 from .report_generator import generate_report
 
 
-MAX_FRAMES = 120
+MAX_FRAMES = 40
 SAMPLE_EVERY = 2  # process every Nth frame for speed
 
 
