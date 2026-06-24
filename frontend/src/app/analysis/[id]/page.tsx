@@ -92,7 +92,7 @@ export default function AnalysisPage() {
             {result.video_url && (
               <div className="bg-dark-800 border border-white/10 rounded-2xl overflow-hidden">
                 <video
-                  src={`http://localhost:8000${result.video_url}`}
+                  src={`https://swing-ai-production-342a.up.railway.app${result.video_url}`}
                   controls
                   muted
                   className="w-full"
