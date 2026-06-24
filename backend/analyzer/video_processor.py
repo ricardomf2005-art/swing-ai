@@ -16,8 +16,27 @@ from .swing_phases import detect_phases
 from .scoring import aggregate_scores
 from .report_generator import generate_report
 
-MAX_FRAMES = 20
-RESIZE_WIDTH = 480  # resize frames before processing to save RAM
+MAX_FRAMES = 30
+RESIZE_WIDTH = 360
+
+
+def _get_rotation(cap: cv2.VideoCapture) -> int:
+    """Return clockwise rotation degrees from video metadata."""
+    try:
+        rot = int(cap.get(cv2.CAP_PROP_ORIENTATION_META))
+        return rot
+    except Exception:
+        return 0
+
+
+def _rotate_frame(frame: np.ndarray, degrees: int) -> np.ndarray:
+    if degrees == 90:
+        return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    elif degrees == 180:
+        return cv2.rotate(frame, cv2.ROTATE_180)
+    elif degrees == 270:
+        return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return frame
 
 
 def process_video(video_path: str, view: str = "dtl") -> dict:
@@ -28,11 +47,12 @@ def process_video(video_path: str, view: str = "dtl") -> dict:
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     duration = total_frames / fps
+    rotation = _get_rotation(cap)
 
     step = max(1, total_frames // MAX_FRAMES)
     frame_indices = []
-    small_frames = []  # resized frames for pose estimation
-    thumb_frames = []  # small thumbnails for keyframes
+    small_frames = []
+    thumb_frames = []
 
     idx = 0
     while True:
@@ -40,13 +60,17 @@ def process_video(video_path: str, view: str = "dtl") -> dict:
         if not ret:
             break
         if idx % step == 0 and len(frame_indices) < MAX_FRAMES:
-            # Resize for processing
+            frame = _rotate_frame(frame, rotation)
             h, w = frame.shape[:2]
-            scale = RESIZE_WIDTH / w
-            small = cv2.resize(frame, (RESIZE_WIDTH, int(h * scale)))
+            # Always resize so longest side = RESIZE_WIDTH
+            if w >= h:
+                scale = RESIZE_WIDTH / w
+            else:
+                scale = RESIZE_WIDTH / h
+            new_w, new_h = int(w * scale), int(h * scale)
+            small = cv2.resize(frame, (new_w, new_h))
             small_frames.append(small)
-            # Tiny thumbnail for keyframes (further compressed)
-            thumb = cv2.resize(frame, (320, int(h * 320 / w)))
+            thumb = cv2.resize(frame, (min(320, new_w), min(480, new_h)))
             thumb_frames.append(thumb)
             frame_indices.append(idx)
             del frame
